@@ -1,0 +1,556 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description:
+  This template deploys a VPC, with public and private subnets spread
+  across three Availability Zones. It deploys an internet gateway, with a default
+  route on the public subnets. It deploys a NAT gateway,
+  and default routes for them in the private subnets. It uses ALB to connect to App Server
+  which further connects to DB.
+
+Parameters:
+  VpcCIDR:
+    Description: Please enter the IP range (notation) for this VPC
+    Type: String
+    Default: 172.20.0.0/20
+
+  LatestAMZL2AmiId:
+    Description: Amazon Linux 2 AMI ID
+    Type: String
+    Default: 'ami-0b5eea76982371e91'
+  
+  InstanceType:
+    Description: Amazon EC2 instance type for the instances
+    Type: String
+    AllowedValues:
+      - t2.micro
+    Default: t2.micro  
+
+  WebPublicSubnet1CIDR:
+    Description: Please enter the IP range (notation) for the public subnet for ALB, Jumpserver and Webserver in the first Availability Zone
+    Type: String
+    Default: 172.20.1.0/24
+
+  WebPublicSubnet2CIDR:
+    Description: Please enter the IP range (notation) for the public subnet for ALB, Jumpserver and Webserver in the second Availability Zone
+    Type: String
+    Default: 172.20.2.0/24
+    
+  WebPublicSubnet3CIDR:
+    Description: Please enter the IP range (notation) for the public subnet for ALB, Jumpserver and Webserver in the third Availability Zone
+    Type: String
+    Default: 172.20.3.0/24
+
+  AppPrivateSubnet1CIDR:
+    Description: Please enter the IP range (notation) for the private subnet for Application Deployment in the first Availability Zone
+    Type: String
+    Default: 172.20.4.0/24
+
+  AppPrivateSubnet2CIDR:
+    Description: Please enter the IP range (notation) for the private subnet for Application Deployment in the second Availability Zone
+    Type: String
+    Default: 172.20.5.0/24
+
+  AppPrivateSubnet3CIDR:
+    Description: Please enter the IP range (notation) for the private subnet for Application Deployment in the third Availability Zone
+    Type: String
+    Default: 172.20.6.0/24
+
+  DBPrivateSubnet1CIDR:
+    Description: Please enter the IP range (notation) for the private subnet for DB Instances in the first Availability Zone
+    Type: String
+    Default: 172.20.7.0/24
+    
+  DBPrivateSubnet2CIDR:
+    Description: Please enter the IP range (notation) for the private subnet for DB Instances in the second Availability Zone
+    Type: String
+    Default: 172.20.8.0/24
+    
+  DBPrivateSubnet3CIDR:
+    Description: Please enter the IP range (notation) for the private subnet for DB Instances in the third Availability Zone
+    Type: String
+    Default: 172.20.9.0/24
+    
+    
+    
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      Tags:
+        - Key: Name
+          Value: my-vpc
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+      - Key: Name
+        Value: my-internet-gateway
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  WebPublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: us-east-1a
+      CidrBlock: !Ref WebPublicSubnet1CIDR
+      Tags:
+        - Key: Name
+          Value: my-public-web-subnet-1
+
+  WebPublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: us-east-1b
+      CidrBlock: !Ref WebPublicSubnet2CIDR
+      Tags:
+        - Key: Name
+          Value: my-public-web-subnet-2
+          
+  WebPublicSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: us-east-1c
+      CidrBlock: !Ref WebPublicSubnet3CIDR
+      Tags:
+        - Key: Name
+          Value: my-public-web-subnet-3
+
+  AppPrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: us-east-1a
+      CidrBlock: !Ref AppPrivateSubnet1CIDR
+      Tags:
+        - Key: Name
+          Value: my-private-app-subnet-1
+
+  AppPrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: us-east-1b
+      CidrBlock: !Ref AppPrivateSubnet2CIDR
+      Tags:
+        - Key: Name
+          Value: my-private-app-subnet-2
+          
+  AppPrivateSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: us-east-1c
+      CidrBlock: !Ref AppPrivateSubnet3CIDR
+      Tags:
+        - Key: Name
+          Value: my-private-app-subnet-3
+
+  DBPrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: us-east-1a
+      CidrBlock: !Ref DBPrivateSubnet1CIDR
+      Tags:
+        - Key: Name
+          Value: my-private-db-subnet-1
+
+  DBPrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: us-east-1b
+      CidrBlock: !Ref DBPrivateSubnet2CIDR
+      Tags:
+        - Key: Name
+          Value: my-private-db-subnet-2
+          
+  DBPrivateSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: us-east-1c
+      CidrBlock: !Ref DBPrivateSubnet3CIDR
+      Tags:
+        - Key: Name
+          Value: my-private-db-subnet-3
+          
+  WebRoutetable:       
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: my-public-web-route-table
+    
+  AppRoutetable:       
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: my-private-app-route-table
+          
+  DBRoutetable:       
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: my-private-db-route-table
+          
+  WebSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    DependsOn: WebPublicSubnet1
+    Properties:
+      RouteTableId: !Ref WebRoutetable
+      SubnetId: !Ref WebPublicSubnet1
+
+  WebSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    DependsOn: WebPublicSubnet2
+    Properties:
+      RouteTableId: !Ref WebRoutetable
+      SubnetId: !Ref WebPublicSubnet2
+      
+  WebSubnet3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    DependsOn: WebPublicSubnet3
+    Properties:
+      RouteTableId: !Ref WebRoutetable
+      SubnetId: !Ref WebPublicSubnet3
+
+  AppSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref AppRoutetable
+      SubnetId: !Ref AppPrivateSubnet1
+
+  AppSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref AppRoutetable
+      SubnetId: !Ref AppPrivateSubnet2
+      
+  AppSubnet3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref AppRoutetable
+      SubnetId: !Ref AppPrivateSubnet3
+
+  DBSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref DBRoutetable
+      SubnetId: !Ref DBPrivateSubnet1
+
+  DBSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref DBRoutetable
+      SubnetId: !Ref DBPrivateSubnet2
+      
+  DBSubnet3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref DBRoutetable
+      SubnetId: !Ref DBPrivateSubnet3
+
+    
+  NatGateway1:  
+    Type: AWS::EC2::NatGateway
+    Properties: 
+      AllocationId: !GetAtt NatGateway1EIP.AllocationId
+      SubnetId: !Ref WebPublicSubnet1
+      ConnectivityType: public
+      Tags:
+      - Key: Name
+        Value: my-nat-gateway
+
+  NatGateway1EIP:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+      
+  InternetGatewayRoute:
+    Type: AWS::EC2::Route
+    Properties: 
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref WebRoutetable
+    
+  AppNATGatewayRoute:
+    Type: AWS::EC2::Route
+    Properties: 
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway1
+      RouteTableId: !Ref AppRoutetable
+    
+  DBNATGatewayRoute:
+    Type: AWS::EC2::Route
+    Properties: 
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway1
+      RouteTableId: !Ref DBRoutetable
+    
+  BastionEC2SG:
+    Type: AWS::EC2::SecurityGroup
+    DependsOn: VPC
+    Properties: 
+      GroupDescription: Bastion SG to be able to login to App and Web Server
+      SecurityGroupIngress: 
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      Tags: 
+        - Key: Name
+          Value: my-jump-server-sg
+      VpcId: !Ref VPC
+
+      
+  PHPAppServerEC2SG:
+    Type: AWS::EC2::SecurityGroup
+    DependsOn: VPC
+    Properties: 
+      GroupDescription: App SG to allow login from Jump Server
+      SecurityGroupIngress: 
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          SourceSecurityGroupId: !Ref BastionEC2SG
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref MyAppLoadbalancerSG
+      Tags: 
+        - Key: Name
+          Value: my-php-app-server-sg
+      VpcId: !Ref VPC
+      
+
+
+
+  BastionEC2:
+    Type: AWS::EC2::Instance
+    Properties: 
+      ImageId: !Ref LatestAMZL2AmiId
+      InstanceType: !Ref InstanceType
+      KeyName: devops_project_key2
+      NetworkInterfaces:
+          - AssociatePublicIpAddress: 'true'
+            DeviceIndex: '0'
+            SubnetId:
+                Ref: WebPublicSubnet1
+            GroupSet:
+              - Ref: BastionEC2SG
+      Tags: 
+        - Key: Name
+          Value: my-jump-server
+           
+
+  PHPAppServer1EC2:
+    Type: AWS::EC2::Instance
+    Properties: 
+      ImageId: !Ref LatestAMZL2AmiId
+      InstanceType: !Ref InstanceType
+      KeyName: devops_project_key2
+      SecurityGroupIds: 
+          - !Ref PHPAppServerEC2SG
+      SubnetId: !Ref AppPrivateSubnet1
+      Tags: 
+        - Key: Name
+          Value: my-php-app-server-1
+      UserData:
+        Fn::Base64:
+          Fn::Sub:
+            - |
+              #!/bin/bash
+              amazon-linux-extras install -y lamp-mariadb10.2-php7.2 php7.2
+              yum install -y httpd
+              systemctl start httpd
+              systemctl enable httpd
+              usermod -a -G apache ec2-user
+              groups
+              chown -R ec2-user:apache /var/www
+              chmod 2775 /var/www && find /var/www -type d -exec chmod 2775 {} \;
+              find /var/www -type f -exec chmod 0664 {} \;
+              yum install php-mbstring php-xml -y
+              systemctl restart httpd
+              systemctl restart php-fpm
+              cd /var/www/html
+              wget https://www.phpmyadmin.net/downloads/phpMyAdmin-latest-all-languages.tar.gz
+              mkdir phpMyAdmin && tar -xvzf phpMyAdmin-latest-all-languages.tar.gz -C phpMyAdmin --strip-components 1
+              rm phpMyAdmin-latest-all-languages.tar.gz
+              mv /var/www/html/phpMyAdmin/config.sample.inc.php /var/www/html/phpMyAdmin/config.inc.php
+              sed -i "s/localhost/${MyDBEndpoint}/g" /var/www/html/phpMyAdmin/config.inc.php
+              echo "PHP Server 1" > index.html
+            - MyDBEndpoint: !GetAtt MyDB.Endpoint.Address
+
+        
+  PHPAppServer2EC2:
+    Type: AWS::EC2::Instance
+    Properties: 
+      ImageId: !Ref LatestAMZL2AmiId
+      InstanceType: !Ref InstanceType
+      KeyName: devops_project_key2
+      SecurityGroupIds: 
+          - !Ref PHPAppServerEC2SG
+      SubnetId: !Ref AppPrivateSubnet2
+      Tags: 
+        - Key: Name
+          Value: my-php-app-server-2
+      UserData:
+        Fn::Base64:
+          Fn::Sub:
+            - |
+              #!/bin/bash
+              amazon-linux-extras install -y lamp-mariadb10.2-php7.2 php7.2
+              yum install -y httpd
+              systemctl start httpd
+              systemctl enable httpd
+              usermod -a -G apache ec2-user
+              groups
+              chown -R ec2-user:apache /var/www
+              chmod 2775 /var/www && find /var/www -type d -exec chmod 2775 {} \;
+              find /var/www -type f -exec chmod 0664 {} \;
+              yum install php-mbstring php-xml -y
+              systemctl restart httpd
+              systemctl restart php-fpm
+              cd /var/www/html
+              wget https://www.phpmyadmin.net/downloads/phpMyAdmin-latest-all-languages.tar.gz
+              mkdir phpMyAdmin && tar -xvzf phpMyAdmin-latest-all-languages.tar.gz -C phpMyAdmin --strip-components 1
+              rm phpMyAdmin-latest-all-languages.tar.gz
+              mv /var/www/html/phpMyAdmin/config.sample.inc.php /var/www/html/phpMyAdmin/config.inc.php
+              sed -i "s/localhost/${MyDBEndpoint}/g" /var/www/html/phpMyAdmin/config.inc.php 
+              echo "PHP Server 2" > index.html
+            - MyDBEndpoint: !GetAtt MyDB.Endpoint.Address           
+            
+            
+          
+  MyAppLoadbalancerSG:
+    Type: AWS::EC2::SecurityGroup
+    DependsOn: VPC
+    Properties: 
+      GroupDescription: Application loadbalancer SG
+      SecurityGroupIngress: 
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      Tags: 
+        - Key: Name
+          Value: my-alb-sg
+      VpcId: !Ref VPC
+      
+      
+  MyAppLoadbalancerTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties: 
+      Name: my-alb-php-tg
+      Protocol: HTTP
+      Port: 80
+      Targets: 
+        - Id:
+            Ref: PHPAppServer1EC2
+        - Id:
+            Ref: PHPAppServer2EC2
+      TargetType: instance
+      TargetGroupAttributes:
+        - Key: stickiness.enabled
+          Value: true
+      VpcId: !Ref VPC
+
+
+  MyAppLoadbalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    DependsOn: InternetGateway
+    Properties: 
+      IpAddressType: ipv4
+      Name: my-alb
+      Scheme: internet-facing
+      SecurityGroups: 
+        - !Ref MyAppLoadbalancerSG
+      Subnets: 
+        - !Ref WebPublicSubnet1
+        - !Ref WebPublicSubnet2
+      Tags: 
+        - Key: Name
+          Value: my-alb
+      Type: application
+      
+      
+  MyAppLoadbalancerListener:
+    Type: "AWS::ElasticLoadBalancingV2::Listener"
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref MyAppLoadbalancerTargetGroup
+      LoadBalancerArn: !Ref MyAppLoadbalancer
+      Port: "80"
+      Protocol: HTTP
+      
+
+  myDBSubnetGroup: 
+    Properties: 
+      DBSubnetGroupDescription: my-db-subnet-group
+      SubnetIds: 
+        - !Ref DBPrivateSubnet1
+        - !Ref DBPrivateSubnet2
+      Tags: 
+        - 
+          Key: Name
+          Value: my-db-subnet-group
+    Type: "AWS::RDS::DBSubnetGroup"
+    
+    
+  myDBSG:
+    Type: AWS::EC2::SecurityGroup
+    DependsOn: VPC
+    Properties: 
+      GroupDescription: RDS DB SG
+      SecurityGroupIngress: 
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref PHPAppServerEC2SG
+      Tags: 
+        - Key: Name
+          Value: my-db-sg
+      VpcId: !Ref VPC
+
+  MyDB:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBSubnetGroupName: "dbsubnetgroup"
+      VPCSecurityGroups: 
+      - !Ref myDBSG
+      AllocatedStorage: '5'
+      DBInstanceClass: db.t2.small
+      Engine: MySQL
+      LicenseModel: general-public-license
+      MasterUsername: admin
+      MasterUserPassword: Password1234
+      DBSubnetGroupName: !Ref myDBSubnetGroup
+      Tags: 
+        - Key: Name
+          Value: my-db
+
+         
+
+
+Outputs:
+
+  WebAppDatabaseEndpoint:
+    Description: "Connection endpoint for the database"
+    Value: !GetAtt MyDB.Endpoint.Address
